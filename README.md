@@ -38,7 +38,7 @@ sequenceDiagram
     Setup->>SR: Register both schemas with BACKWARD_TRANSITIVE compatibility
     SR-->>Setup: Schema IDs
     Setup->>Services: Submit Flink job and configure Connect sink
-    Note over Setup: Setup tasks exit successfully; runtime services keep running
+    Note over Setup: Setup tasks exit successfully, runtime services keep running
 ```
 
 ClickHouse is pinned to 26.3.2.3 for its `kafka_schema_registry_skip_bytes` support.
