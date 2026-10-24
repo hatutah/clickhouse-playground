@@ -1,0 +1,17 @@
+syntax = "proto3";
+package demo.events;
+option java_multiple_files = true;
+
+message SearchEvent {
+  string event_id = 1;
+  string run_id = 2;
+  string event_type = 3;
+  int64 event_time_ms = 4;
+  string search_id = 5;
+  string session_id = 6;
+  string user_id = 7;
+  string query_text = 8;
+  string result_id = 9;
+  int32 result_position = 10;
+  int32 is_bot = 11;
+}

@@ -1,0 +1,16 @@
+syntax = "proto3";
+package demo.events;
+option java_multiple_files = true;
+
+message SearchClick {
+  string event_id = 1;
+  string run_id = 2;
+  int64 event_time_ms = 3;
+  string search_id = 4;
+  string session_id = 5;
+  string user_id = 6;
+  string query_normalized = 7;
+  string result_id = 8;
+  int32 result_position = 9;
+  string position_bucket = 10;
+}

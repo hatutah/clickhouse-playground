@@ -1,0 +1,182 @@
+name: search-playground
+
+x-app: &app
+  image: search-playground-app:local
+  build: .
+  environment: &app-env
+    KAFKA_BROKERS: kafka:29092
+    CLICKHOUSE_URL: http://clickhouse:8123
+    CONNECT_URL: http://connect:8083
+    FLINK_URL: http://jobmanager:8081
+    SCHEMA_REGISTRY_URL: http://schema-registry:8081
+
+x-flink: &flink
+  image: search-playground-flink:local
+  build:
+    context: .
+    dockerfile: flink/Dockerfile
+  environment:
+    FLINK_PROPERTIES: |
+      jobmanager.rpc.address: jobmanager
+      rest.address: jobmanager
+      taskmanager.numberOfTaskSlots: 2
+      parallelism.default: 1
+
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:29093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:29092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  topics:
+    image: apache/kafka:3.9.1
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        for topic in search_events search_clicks; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 \
+            --create --if-not-exists --topic "$$topic" --partitions 1 --replication-factor 1
+        done
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.9.0
+    ports:
+      - "127.0.0.1:8082:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
+      SCHEMA_REGISTRY_HEAP_OPTS: -Xms128m -Xmx256m
+    depends_on:
+      kafka: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/subjects"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  schemas:
+    <<: *app
+    command: ["node", "dist/register-schemas.js"]
+    depends_on:
+      schema-registry: { condition: service_healthy }
+
+  clickhouse:
+    image: search-playground-clickhouse:local
+    build:
+      context: .
+      dockerfile: clickhouse/Dockerfile
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    environment:
+      CLICKHOUSE_DB: search_demo
+      CLICKHOUSE_USER: demo
+      CLICKHOUSE_PASSWORD: demo
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    depends_on:
+      topics: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "demo", "--password", "demo", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  connect:
+    build: ./connect
+    image: search-playground-connect:local
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    depends_on:
+      topics: { condition: service_completed_successfully }
+      clickhouse: { condition: service_healthy }
+      schemas: { condition: service_completed_successfully }
+
+  connector:
+    <<: *app
+    command: ["node", "dist/register-connector.js"]
+    depends_on:
+      connect: { condition: service_started }
+
+  jobmanager:
+    <<: *flink
+    command: jobmanager
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      topics: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/overview"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  taskmanager:
+    <<: *flink
+    command: taskmanager
+    depends_on:
+      jobmanager: { condition: service_healthy }
+
+  flink-submit:
+    <<: *flink
+    command: ["bash", "/opt/flink/submit.sh"]
+    depends_on:
+      jobmanager: { condition: service_healthy }
+      taskmanager: { condition: service_started }
+      schemas: { condition: service_completed_successfully }
+
+  producer:
+    <<: *app
+    profiles: ["tools"]
+    environment:
+      <<: *app-env
+      COUNT: ${COUNT:-20}
+      INTERVAL_MS: ${INTERVAL_MS:-200}
+    depends_on:
+      topics: { condition: service_completed_successfully }
+      schemas: { condition: service_completed_successfully }
+
+  smoke:
+    <<: *app
+    profiles: ["tools"]
+    command: ["node", "dist/smoke.js"]
+    depends_on:
+      connector: { condition: service_completed_successfully }
+      flink-submit: { condition: service_completed_successfully }
+      clickhouse: { condition: service_healthy }
+
+volumes:
+  kafka-data:
+  clickhouse-data:

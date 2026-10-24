@@ -1,0 +1,4 @@
+node_modules/
+dist/
+flink/target/
+.DS_Store
