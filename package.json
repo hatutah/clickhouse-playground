@@ -1,5 +1,5 @@
 {
-  "name": "search-events-playground",
+  "name": "clickhouse-playground",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.21.0",

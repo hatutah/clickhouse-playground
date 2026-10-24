@@ -1,4 +1,6 @@
-# Search events playground
+# ClickHouse playground
+
+[![CI](https://github.com/hatutah/clickhouse-playground/actions/workflows/ci.yml/badge.svg)](https://github.com/hatutah/clickhouse-playground/actions/workflows/ci.yml)
 
 A small, local Docker Compose setup for exploring Kafka, registry-backed Protobuf, Flink's Java Table API, and two ways to ingest events into ClickHouse. No cloud accounts, ZooKeeper, or host language runtime required.
 
@@ -39,7 +41,7 @@ sequenceDiagram
     Note over Setup: Setup tasks exit successfully; runtime services keep running
 ```
 
-ClickHouse is pinned to 26.3.2.3 for its `kafka_schema_registry_skip_bytes` support. If upgrading from the earlier JSON example, reset this playground's volumes with `docker compose down -v --remove-orphans` before starting. This deletes its old events, schemas, and consumer offsets; JSON and Protobuf must not be mixed in these topics.
+ClickHouse is pinned to 26.3.2.3 for its `kafka_schema_registry_skip_bytes` support.
 
 The smoke test checks that both registered schemas are Protobuf and that an incompatible field-type change fails the registry compatibility check. It then waits for the job and sink task, produces a batch with a unique `run_id`, and checks both ClickHouse paths. Expected output:
 
@@ -276,6 +278,12 @@ pnpm run produce
 pnpm run smoke
 ```
 
-Host commands default to the published localhost endpoints. `KAFKA_BROKERS`, `CLICKHOUSE_URL`, `CONNECT_URL`, `FLINK_URL`, and `SCHEMA_REGISTRY_URL` override these endpoints when needed.
+Host commands default to the published localhost endpoints. `KAFKA_BROKERS`, `CLICKHOUSE_URL`, `CONNECT_URL`, `FLINK_URL`, and `SCHEMA_REGISTRY_URL` override these endpoints when needed. The Flink job reads `KAFKA_BROKERS` and `SCHEMA_REGISTRY_URL` the same way; [compose.yaml](compose.yaml) sets them for the Flink containers.
 
 Upstream references: [Flink Table API](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/tableApi/), [Flink Kafka table connector](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/connectors/table/kafka/), [ClickHouse Kafka Connect sink](https://clickhouse.com/docs/integrations/kafka/clickhouse-kafka-connect-sink), and [ClickHouse Kafka engine](https://clickhouse.com/docs/engines/table-engines/integrations/kafka).
+
+## License
+
+This project is released under the [MIT License](LICENSE).
+
+The stack downloads third-party software at build and run time; each keeps its own license. Apache Kafka, Apache Flink, and the ClickHouse server and Kafka Connect sink are Apache 2.0. Confluent Schema Registry (`confluentinc/cp-schema-registry`) is under the [Confluent Community License](https://www.confluent.io/confluent-community-license/), which permits this kind of local use but is not an OSI-approved open source license. Confluent's Protobuf serializer and converter libraries list both that license and Apache 2.0. Build downloads are pinned and verified with SHA-256 checksums.

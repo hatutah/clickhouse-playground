@@ -13,12 +13,17 @@ import org.apache.flink.types.Row;
 public class ProtoFunctions {
     public static class DecodeEvent extends ScalarFunction {
         private transient KafkaProtobufDeserializer<SearchEvent> decoder;
+        private final String registryUrl;
+
+        public DecodeEvent(String registryUrl) {
+            this.registryUrl = registryUrl;
+        }
 
         @Override
         public void open(FunctionContext context) {
             decoder = new KafkaProtobufDeserializer<>();
             decoder.configure(Map.of(
-                    "schema.registry.url", "http://schema-registry:8081",
+                    "schema.registry.url", registryUrl,
                     "specific.protobuf.value.type", SearchEvent.class.getName()), false);
         }
 
@@ -41,12 +46,17 @@ public class ProtoFunctions {
 
     public static class EncodeClick extends ScalarFunction {
         private transient KafkaProtobufSerializer<SearchClick> encoder;
+        private final String registryUrl;
+
+        public EncodeClick(String registryUrl) {
+            this.registryUrl = registryUrl;
+        }
 
         @Override
         public void open(FunctionContext context) {
             encoder = new KafkaProtobufSerializer<>();
             encoder.configure(Map.of(
-                    "schema.registry.url", "http://schema-registry:8081",
+                    "schema.registry.url", registryUrl,
                     "auto.register.schemas", false,
                     "use.latest.version", true), false);
         }

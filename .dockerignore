@@ -1,4 +1,11 @@
 .git
+.github
+.claude
 node_modules
+.pnpm-store
 dist
 flink/target
+.env
+.env.*
+*.log
+.DS_Store

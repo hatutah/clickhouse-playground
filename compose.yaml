@@ -1,7 +1,7 @@
-name: search-playground
+name: clickhouse-playground
 
 x-app: &app
-  image: search-playground-app:local
+  image: clickhouse-playground-app:local
   build: .
   environment: &app-env
     KAFKA_BROKERS: kafka:29092
@@ -11,11 +11,13 @@ x-app: &app
     SCHEMA_REGISTRY_URL: http://schema-registry:8081
 
 x-flink: &flink
-  image: search-playground-flink:local
+  image: clickhouse-playground-flink:local
   build:
     context: .
     dockerfile: flink/Dockerfile
   environment:
+    KAFKA_BROKERS: kafka:29092
+    SCHEMA_REGISTRY_URL: http://schema-registry:8081
     FLINK_PROPERTIES: |
       jobmanager.rpc.address: jobmanager
       rest.address: jobmanager
@@ -89,7 +91,7 @@ services:
       schema-registry: { condition: service_healthy }
 
   clickhouse:
-    image: search-playground-clickhouse:local
+    image: clickhouse-playground-clickhouse:local
     build:
       context: .
       dockerfile: clickhouse/Dockerfile
@@ -114,7 +116,7 @@ services:
 
   connect:
     build: ./connect
-    image: search-playground-connect:local
+    image: clickhouse-playground-connect:local
     ports:
       - "127.0.0.1:8083:8083"
     environment:

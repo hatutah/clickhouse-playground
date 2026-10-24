@@ -12,6 +12,8 @@ import static org.apache.flink.table.api.Expressions.call;
 
 public class SearchClickJob {
     public static void main(String[] args) {
+        String brokers = env("KAFKA_BROKERS", "kafka:29092");
+        String registryUrl = env("SCHEMA_REGISTRY_URL", "http://schema-registry:8081");
         TableEnvironment tables = TableEnvironment.create(
                 EnvironmentSettings.inStreamingMode());
         tables.getConfig().getConfiguration()
@@ -24,7 +26,7 @@ public class SearchClickJob {
                         .column("payload", DataTypes.BYTES())
                         .build())
                 .option("topic", "search_events")
-                .option("properties.bootstrap.servers", "kafka:29092")
+                .option("properties.bootstrap.servers", brokers)
                 .option("properties.group.id", "flink-search-transform")
                 .option("scan.startup.mode", "group-offsets")
                 .option("properties.auto.offset.reset", "earliest")
@@ -36,13 +38,13 @@ public class SearchClickJob {
                         .column("payload", DataTypes.BYTES())
                         .build())
                 .option("topic", "search_clicks")
-                .option("properties.bootstrap.servers", "kafka:29092")
+                .option("properties.bootstrap.servers", brokers)
                 .option("sink.delivery-guarantee", "at-least-once")
                 .format("raw")
                 .build());
 
         tables.from("search_events")
-                .select(call(ProtoFunctions.DecodeEvent.class, $("payload")).as("event"))
+                .select(call(new ProtoFunctions.DecodeEvent(registryUrl), $("payload")).as("event"))
                 .select($("event").flatten())
                 .as($("event_id"), $("run_id"), $("event_type"), $("event_time_ms"),
                         $("search_id"), $("session_id"), $("user_id"), $("query_text"),
@@ -56,11 +58,16 @@ public class SearchClickJob {
                         $("result_id"), $("result_position"),
                         $("result_position").isLessOrEqual(3)
                                 .then(lit("top_3"), lit("below_3")).as("position_bucket"))
-                .select(call(ProtoFunctions.EncodeClick.class,
+                .select(call(new ProtoFunctions.EncodeClick(registryUrl),
                         $("event_id"), $("run_id"), $("event_time_ms"),
                         $("search_id"), $("session_id"), $("user_id"),
                         $("query_normalized"), $("result_id"), $("result_position"),
                         $("position_bucket")).as("payload"))
                 .executeInsert("search_clicks");
+    }
+
+    private static String env(String name, String fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : value;
     }
 }

@@ -1,4 +1,21 @@
+# Dependencies and build output
 node_modules/
+.pnpm-store/
 dist/
 flink/target/
+*.tsbuildinfo
+
+# Local env and logs
+.env
+.env.*
+*.log
+
+# Editors and OS
 .DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json
