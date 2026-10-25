@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/hatutah/clickhouse-playground/actions/workflows/ci.yml/badge.svg)](https://github.com/hatutah/clickhouse-playground/actions/workflows/ci.yml)
 
-A small, local Docker Compose setup for exploring Kafka, registry-backed Protobuf, Flink's Java Table API, and two ways to ingest events into ClickHouse. No cloud accounts, ZooKeeper, or host language runtime required.
+A small, local Docker Compose setup for exploring Kafka, registry-backed Protobuf, Flink's Java Table API, and two ways to ingest events into ClickHouse.
 
 Both paths consume the same input independently. `raw_events` contains impressions and clicks, including bots. `search_clicks` contains the human clicks selected and enriched by Flink.
 
